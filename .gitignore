@@ -55,3 +55,6 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+.vs
+MySavings.ApiService/mysavings.db-shm
+MySavings.ApiService/mysavings.db-wal

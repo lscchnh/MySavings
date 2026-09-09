@@ -1,0 +1,211 @@
+.page-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+}
+
+.card h2 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #333;
+}
+
+.card p {
+    color: #666;
+    line-height: 1.6;
+}
+
+.upload-section {
+    margin: 2rem 0;
+    padding: 2rem;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.file-input {
+    margin-bottom: 1rem;
+}
+
+.file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f9fafb;
+    border-radius: 6px;
+}
+
+.file-name {
+    font-weight: 600;
+    color: #333;
+}
+
+.file-size {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.btn {
+    padding: 0.75rem 2rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.alert {
+    margin-top: 1.5rem;
+    padding: 1rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.alert-success {
+    background: #d1fae5;
+    border: 1px solid #10b981;
+    color: #065f46;
+}
+
+.alert-error {
+    background: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #991b1b;
+}
+
+.info-section h3 {
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.info-section h4 {
+    color: #555;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.info-section ul,
+.info-section ol {
+    color: #666;
+    line-height: 1.8;
+}
+
+.info-section li {
+    margin-bottom: 0.5rem;
+}
+
+.info-section strong {
+    color: #333;
+}
+
+.format-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.format-table th {
+    background: #f9fafb;
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.format-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #e5e7eb;
+    color: #666;
+}
+
+.format-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.note {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    border-radius: 4px;
+    color: #1e40af;
+}
+
+.note strong {
+    color: #1e3a8a;
+}
+
+/* ── Excel preview table ── */
+.excel-preview {
+    overflow-x: auto;
+    margin: 1rem 0;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+
+.excel-table {
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+.excel-table .header-row th {
+    background: #1d6f42;
+    color: #fff;
+    border-bottom: none;
+    font-size: 0.78rem;
+}
+
+.excel-table tbody tr:nth-child(even) {
+    background: #f0fdf4;
+}
+
+.excel-table .more-rows td {
+    color: #9ca3af;
+    font-style: italic;
+    padding: 0.4rem;
+}
+
+/* ── Legend table ── */
+.format-legend {
+    margin-top: 1.5rem;
+}
+
+.format-legend code {
+    background: #f1f5f9;
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+    font-size: 0.82rem;
+    color: #0f172a;
+}
+
+.mt-3 {
+    margin-top: 1rem;
+}

@@ -1,0 +1,564 @@
+@page "/savings"
+@using MySavings.Web.ApiClients
+@using MySavings.Web.Helpers
+@using System.Globalization
+@inject DashboardApiClient DashboardApi
+@inject MonthlyEntryApiClient MonthlyEntryApi
+@inject PersonSettingsApiClient PersonSettingsApi
+@inject TransferGroupApiClient TransferGroupApi
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Épargne - MySavings</PageTitle>
+
+<h1>Épargne</h1>
+
+@if (showSaveToast)
+{
+    <div style="position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999; padding:0.75rem 1.25rem; background:#198754; color:#fff; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,.25);">
+        ✅ Enregistré avec succès
+    </div>
+}
+
+<div class="page-container">
+    @if (isLoading)
+    {
+        <p><em>Chargement...</em></p>
+    }
+
+    else
+    {
+        <!-- New entry form -->
+        <div class="card entry-form-section">
+            <h2>Nouvelle entrée mensuelle</h2>
+            <p class="text-muted">Les <a href="/allocation-rules">règles d'allocation</a> actuellement configurées seront appliquées à cette nouvelle entrée.</p>
+
+            <EditForm Model="monthlyEntry" OnValidSubmit="HandleSubmit">
+                <div class="form-layout">
+                    <!-- Common fields -->
+                    <div class="common-fields">
+                        <div class="form-group">
+                            <label>Année</label>
+                            <InputNumber @bind-Value="monthlyEntry.Year" class="form-control" min="2020" max="2100" />
+                        </div>
+                        <div class="form-group">
+                            <label>Mois</label>
+                            <InputSelect @bind-Value="monthlyEntry.MonthNumber" class="form-control">
+                                <option value="1">Janvier</option>
+                                <option value="2">Février</option>
+                                <option value="3">Mars</option>
+                                <option value="4">Avril</option>
+                                <option value="5">Mai</option>
+                                <option value="6">Juin</option>
+                                <option value="7">Juillet</option>
+                                <option value="8">Août</option>
+                                <option value="9">Septembre</option>
+                                <option value="10">Octobre</option>
+                                <option value="11">Novembre</option>
+                                <option value="12">Décembre</option>
+                            </InputSelect>
+                        </div>
+                        <div class="form-group">
+                            <label>Fin de mois avant revenus (€)</label>
+                            <InputNumber @bind-Value="monthlyEntry.EndMonthBeforeSalary" class="form-control" />
+                            <small class="text-muted">Montant total restant sur vos comptes communs avant de recevoir les revenus</small>
+                        </div>
+                    </div>
+
+                    <!-- Individual salaries -->
+                    <div class="salary-fields">
+                        <div class="person-salary">
+                            <h4>@person1Name</h4>
+                            <div class="form-group">
+                                <label>Revenu (€)</label>
+                                <InputNumber @bind-Value="monthlyEntry.Person1Salary" class="form-control" />
+                            </div>
+                        </div>
+                        <div class="person-salary">
+                            <h4>@person2Name</h4>
+                            <div class="form-group">
+                                <label>Revenu (€)</label>
+                                <InputNumber @bind-Value="monthlyEntry.Person2Salary" class="form-control" />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span>Enregistrement...</span>
+                        }
+                        else
+                        {
+                            <span>Enregistrer</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+            @if (!string.IsNullOrEmpty(submitError))
+            {
+                <div class="alert alert-danger mt-2">
+                    @submitError
+                </div>
+            }
+        </div>
+
+        @if (history.Any())
+        {
+            <div class="month-selector card">
+                <h3>Visualiser le mois : @selectedMonth.ToString("MMMM yyyy")</h3>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <select @bind="selectedMonthString" @bind:after="LoadSelectedMonthAsync" class="form-control" style="max-width:360px;">
+                        @foreach (var item in history.OrderByDescending(h => h.Month))
+                        {
+                            <option value="@item.Month.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)">@item.Month.ToString("MMMM yyyy")</option>
+                        }
+                    </select>
+                </div>
+                @if (!string.IsNullOrEmpty(deleteMonthError))
+                {
+                    <div class="alert alert-danger mt-2">@deleteMonthError</div>
+                }
+            </div>
+
+            @if (currentView != null)
+            {
+                <!-- Month summary -->
+                <div class="card summary-card-compact">
+                    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <h2 class="mb-0">Résumé - @currentView.Month.ToString("MMMM yyyy")</h2>
+                        <button class="btn btn-danger" @onclick="DeleteCurrentMonthAsync" disabled="@isDeletingMonth">
+                            @(isDeletingMonth ? "Suppression..." : "Supprimer ce mois")
+                        </button>
+                    </div>
+
+                    <div class="summary-stats-compact">
+                        <div class="stat-group">
+                            <h3>Total Couple</h3>
+                            <div class="stat-row">
+                                <span class="stat-label">Revenus totaux</span>
+                                <span class="stat-value">@currentView.TotalSalary.ToString("N2") €</span>
+                            </div>
+                            <div class="stat-row detail">
+                                <span class="stat-label-sub">@person1Name (@(currentView.Person1ContributionPercent.ToString("P0")))</span>
+                                <span class="stat-value-sub">@currentView.Person1Salary.ToString("N2") €</span>
+                            </div>
+                            <div class="stat-row detail">
+                                <span class="stat-label-sub">@person2Name (@(currentView.Person2ContributionPercent.ToString("P0")))</span>
+                                <span class="stat-value-sub">@currentView.Person2Salary.ToString("N2") €</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Dépenses totales</span>
+                                <span class="stat-value expense">@currentView.TotalExpenses.ToString("N2") €</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label">Épargne</span>
+                                <span class="stat-value savings">@currentView.TotalSavings.ToString("N2") €</span>
+                            </div>
+                            <div class="stat-row highlight">
+                                <span class="stat-label">Ratio E/S</span>
+                                <span class="stat-value ratio">@((currentView.TotalSavingsRatio * 100).ToString("N1"))%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Allocations -->
+                @if (currentView.Allocations.Any())
+                {
+                    <div class="card allocation-amounts-card">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h2 class="mb-0">Montants à allouer — @currentView.Month.ToString("MMMM yyyy")</h2>
+                            <div class="d-flex gap-2 align-items-center">
+                                <button class="btn btn-sm btn-primary" @onclick="SaveAllTransfersAsync" disabled="@isSavingTransfers">
+                                    @if (isSavingTransfers) { <span>Enregistrement...</span> } else { <span>💾 Enregistrer</span> }
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="allocations-table-container">
+                            <table class="allocations-table">
+                                <thead>
+                                    <tr>
+                                        <th>Compte</th>
+                                        <th>Propriétaire</th>
+                                        <th>Répartition (%)</th>
+                                        <th class="text-end">Montant calculé</th>
+                                        <th class="text-end">Montant à virer</th>
+                                        <th class="text-center">
+                                            <label class="d-flex align-items-center justify-content-center gap-1" style="cursor:pointer; font-weight:600; white-space:nowrap; margin:0;">
+                                                <input type="checkbox"
+                                                       checked="@AllAllocated"
+                                                       @onchange="ToggleAll"
+                                                       disabled="@isSavingTransfers" />
+                                                Alloué
+                                            </label>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var allocation in currentView.Allocations.OrderBy(a => a.OwnerId).ThenBy(a => a.AccountName))
+                                    {
+                                        <tr>
+                                            <td data-label="Compte">
+                                                <strong>@allocation.AccountName</strong>
+                                            </td>
+                                            <td data-label="Propriétaire">@GetOwnerDisplayName(allocation.OwnerId)</td>
+                                            <td data-label="Répartition (%)">@((allocation.Weight * 100).ToString("N2")) %</td>
+                                            <td class="text-end" data-label="Montant calculé">@ComputeAllocationAmount(allocation).ToString("N2") €</td>
+                                            <td class="text-end @(allocation.TransferableAmount == 0 ? "text-danger fw-bold" : "")" data-label="Montant à virer">@allocation.TransferableAmount.ToString("N2") €</td>
+                                             <td class="text-center" data-label="Alloué">
+                                                <input type="checkbox" class="form-check-input"
+                                                    checked="@allocation.IsTransferred"
+                                                    @onchange="async e => await ToggleAllocationAsync(allocation, (bool)e.Value!)" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                                <tfoot>
+                                    <tr class="total-row">
+                                        <td colspan="3"><strong>Total</strong></td>
+                                        <td class="text-end" data-label="Montant calculé"><strong class="text-success">@currentView.Allocations.Sum(a => ComputeAllocationAmount(a)).ToString("N2") €</strong></td>
+                                        <td class="text-end" data-label="Montant à virer"><strong class="text-success">@currentView.Allocations.Sum(a => a.TransferableAmount).ToString("N2") €</strong></td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                }
+
+                @if (!currentView.Allocations.Any())
+                {
+                    @if (currentView.TotalSavings <= 0)
+                    {
+                        <div class="alert alert-warning savings-negative-alert">
+                            <strong>⚠ Épargne négative ce mois-ci (@currentView.TotalSavings.ToString("N2") €)</strong> — aucune allocation n'a été calculée.
+                        </div>
+                    }
+                }
+
+                @if (currentView.Allocations.Any() && transferGroups.Any())
+                {
+                    <div class="card virements-section">
+                        <h2>Virements à effectuer</h2>
+                        <div class="virements-grid">
+                            @foreach (var tg in transferGroups)
+                            {
+                                var groupAllocs = tg.Accounts
+                                    .Select(account => currentView.Allocations.FirstOrDefault(
+                                        a => a.AccountName.Equals(account.Name, StringComparison.OrdinalIgnoreCase)))
+                                    .Where(a => a != null)
+                                    .ToList();
+                                decimal groupTotal = groupAllocs.Sum(a => ComputeAllocationAmount(a!));
+                                bool groupDone = IsVirementDone(groupAllocs.ToArray()!);
+                                <div class="virement-card">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h3 class="mb-0">@tg.Name</h3>
+                                        <div class="d-flex align-items-center gap-2">
+                                            @if (groupDone)
+                                            {
+                                                <span class="text-success" title="Ce virement a été effectué" style="cursor:help; font-size:1.1em;">✅</span>
+                                            }
+                                            <input type="checkbox" class="form-check-input"
+                                                checked="@groupDone"
+                                                @onchange="async e => await ToggleVirementGroupAsync(groupAllocs.ToArray()!, (bool)e.Value!)" />
+                                        </div>
+                                    </div>
+                                    <div class="virement-details">
+                                        @foreach (var alloc in groupAllocs)
+                                        {
+                                            <div class="virement-line d-flex align-items-center gap-1">
+                                                <span>@alloc!.AccountName : @ComputeAllocationAmount(alloc).ToString("N2") €</span>
+                                                @if (alloc.IsTransferred)
+                                                {
+                                                    <span class="text-success" title="Ce virement a été effectué" style="cursor:help;">✅</span>
+                                                }
+                                            </div>
+                                        }
+                                        @if (!groupAllocs.Any())
+                                        {
+                                            <p class="text-muted small">Aucun compte correspondant ce mois-ci.</p>
+                                        }
+                                    </div>
+                                    <div class="virement-total">
+                                        <strong>Total : @groupTotal.ToString("N2") €</strong>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            }
+        }
+        else
+        {
+            <div class="card">
+                <p>Aucune donnée disponible. Créez votre première entrée mensuelle ci-dessus.</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+private List<SummaryViewDto> history = new();
+private List<TransferGroupDto> transferGroups = new();
+private SummaryViewDto? currentView;
+private DateTime selectedMonth = DateTime.Now;
+private string selectedMonthString = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+private bool isLoading = true;
+private bool isSubmitting = false;
+private string submitError = string.Empty;
+private bool isDeletingMonth = false;
+private string deleteMonthError = string.Empty;
+private string person1Name = "Person 1";
+private string person2Name = "Person 2";
+private Dictionary<int, string> ownerNames = new();
+private bool showSaveToast = false;
+
+private MonthlyEntryFormModel monthlyEntry = new()
+{
+    Year = DateTime.Now.Year,
+    MonthNumber = DateTime.Now.Month
+};
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPersonNames();
+        await LoadHistory();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var stored = await LoadSelectedMonthFromStorageAsync();
+            if (!string.IsNullOrEmpty(stored) && DateTime.TryParseExact(stored + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+            {
+                selectedMonth = parsed;
+                selectedMonthString = selectedMonth.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                currentView = history.FirstOrDefault(h => h.Month.Year == selectedMonth.Year && h.Month.Month == selectedMonth.Month);
+            }
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadPersonNames()
+    {
+        try
+        {
+            var settings = await PersonSettingsApi.GetAllAsync();
+            var ordered = settings.OrderBy(s => s.Id).ToList();
+            ownerNames = OwnerNameLookup.BuildMap(ordered);
+            if (ordered.Count > 0) person1Name = ordered[0].Name;
+            if (ordered.Count > 1) person2Name = ordered[1].Name;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading person names: {ex.Message}");
+        }
+    }
+
+    private string GetOwnerDisplayName(int? ownerId) => OwnerNameLookup.GetName(ownerNames, ownerId);
+
+    private async Task LoadHistory()
+    {
+        isLoading = true;
+        try
+        {
+            history = await DashboardApi.GetDashboardHistoryAsync();
+            transferGroups = await TransferGroupApi.GetAllAsync();
+            if (history.Any())
+            {
+                selectedMonth = history.OrderByDescending(h => h.Month).First().Month;
+                selectedMonthString = selectedMonth.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                currentView = history.FirstOrDefault(h => h.Month.Year == selectedMonth.Year && h.Month.Month == selectedMonth.Month);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void LoadSelectedMonth()
+    {
+        if (!string.IsNullOrEmpty(selectedMonthString) &&
+            DateTime.TryParseExact(selectedMonthString, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            selectedMonth = parsed;
+        }
+        currentView = history.FirstOrDefault(h => h.Month.Year == selectedMonth.Year && h.Month.Month == selectedMonth.Month);
+    }
+
+    private async Task LoadSelectedMonthAsync()
+    {
+        LoadSelectedMonth();
+        await SaveSelectedMonthAsync();
+    }
+
+    private async Task SaveSelectedMonthAsync()
+    {
+        try
+        {
+            if (JS != null)
+                await JS.InvokeVoidAsync("localStorage.setItem", "mysavings_selectedMonth", selectedMonth.ToString("yyyy-MM"));
+        }
+        catch { }
+    }
+
+    private async Task<string> LoadSelectedMonthFromStorageAsync()
+    {
+        try
+        {
+            if (JS != null)
+            {
+                var value = await JS.InvokeAsync<string>("localStorage.getItem", "mysavings_selectedMonth");
+                return value ?? string.Empty;
+            }
+        }
+        catch { }
+        return string.Empty;
+    }
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        submitError = string.Empty;
+        try
+        {
+            var request = new CreateMonthlyEntryRequest
+            {
+                Year = monthlyEntry.Year,
+                Month = monthlyEntry.MonthNumber,
+                Person1Salary = monthlyEntry.Person1Salary,
+                Person2Salary = monthlyEntry.Person2Salary,
+                EndMonthBeforeSalary = monthlyEntry.EndMonthBeforeSalary
+            };
+
+            var response = await MonthlyEntryApi.CreateAsync(request);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                submitError = $"Erreur ({(int)response.StatusCode}) : {body}";
+                return;
+            }
+
+            monthlyEntry = new() { Year = DateTime.Now.Year, MonthNumber = DateTime.Now.Month };
+            await LoadHistory();
+        }
+        catch (Exception ex)
+        {
+            submitError = $"Erreur : {ex.Message}";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task DeleteCurrentMonthAsync()
+    {
+        if (currentView == null || currentView.Id <= 0)
+        {
+            deleteMonthError = "Impossible de supprimer cette entrée.";
+            return;
+        }
+
+        deleteMonthError = string.Empty;
+
+        var monthLabel = currentView.Month.ToString("MMMM yyyy");
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Supprimer l'entrée de {monthLabel} ?");
+        if (!confirmed) return;
+
+        isDeletingMonth = true;
+        try
+        {
+            var response = await MonthlyEntryApi.DeleteAsync(currentView.Id);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                deleteMonthError = $"Erreur ({(int)response.StatusCode}) : {body}";
+                return;
+            }
+
+            await LoadHistory();
+            await SaveSelectedMonthAsync();
+        }
+        catch (Exception ex) { deleteMonthError = $"Erreur : {ex.Message}"; }
+        finally { isDeletingMonth = false; }
+    }
+
+    private static decimal ComputeAllocationAmount(AllocationDto allocation) => allocation.Amount;
+
+    private bool isSavingTransfers = false;
+
+    private bool AllAllocated => currentView?.Allocations.Count > 0 && currentView.Allocations.All(a => a.IsTransferred);
+
+    private void ToggleAll(ChangeEventArgs e)
+    {
+        if (currentView == null) return;
+        bool check = (bool)e.Value!;
+        foreach (var a in currentView.Allocations) a.IsTransferred = check;
+    }
+
+    private static bool IsVirementDone(AllocationDto?[] allocations)
+    {
+        var valid = allocations.Where(a => a != null).ToList();
+        return valid.Count > 0 && valid.All(a => a!.IsTransferred);
+    }
+
+    private async Task ToggleAllocationAsync(AllocationDto allocation, bool value)
+    {
+        allocation.IsTransferred = value;
+        try { await DashboardApi.SetAllocationTransferredAsync(allocation.Id, value); }
+        catch (Exception ex) { Console.WriteLine($"Error saving transfer state: {ex.Message}"); }
+    }
+
+    private async Task ToggleVirementGroupAsync(AllocationDto?[] allocations, bool value)
+    {
+        foreach (var alloc in allocations.Where(a => a != null))
+        {
+            alloc!.IsTransferred = value;
+            try { await DashboardApi.SetAllocationTransferredAsync(alloc.Id, value); }
+            catch (Exception ex) { Console.WriteLine($"Error saving transfer state: {ex.Message}"); }
+        }
+    }
+
+    private async Task SaveAllTransfersAsync()
+    {
+        if (currentView == null) return;
+        isSavingTransfers = true;
+        try
+        {
+            foreach (var alloc in currentView.Allocations)
+            {
+                try { await DashboardApi.SetAllocationTransferredAsync(alloc.Id, alloc.IsTransferred); }
+                catch (Exception ex) { Console.WriteLine($"Error saving transfer state for {alloc.AccountName}: {ex.Message}"); }
+            }
+            showSaveToast = true;
+            StateHasChanged();
+            _ = Task.Delay(3000).ContinueWith(_ => { showSaveToast = false; InvokeAsync(StateHasChanged); });
+        }
+        finally
+        {
+            isSavingTransfers = false;
+        }
+    }
+
+    private class MonthlyEntryFormModel
+    {
+        public int Year { get; set; }
+        public int MonthNumber { get; set; }
+        public decimal Person1Salary { get; set; }
+        public decimal Person2Salary { get; set; }
+        public decimal EndMonthBeforeSalary { get; set; }
+    }
+}

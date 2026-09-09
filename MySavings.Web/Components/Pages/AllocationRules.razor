@@ -1,0 +1,653 @@
+@page "/allocation-rules"
+@using MySavings.Web.ApiClients
+@using MySavings.Web.Helpers
+@inject AllocationRuleApiClient AllocationRuleApi
+@inject PersonSettingsApiClient PersonSettingsApi
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Comptes et règles d'allocations - MySavings</PageTitle>
+
+<h1>Comptes et règles d'allocations</h1>
+
+<div class="page-container">
+	@if (isLoading)
+	{
+		<p><em>Chargement...</em></p>
+	}
+	else
+	{
+		@if (owners.Count >= 2)
+		{
+			<div class="section">
+				<h2>Répartition entre propriétaires</h2>
+
+				@if (!string.IsNullOrEmpty(sharesErrorMessage))
+				{
+					<div class="alert alert-danger">@sharesErrorMessage</div>
+				}
+				@if (!string.IsNullOrEmpty(sharesSuccessMessage))
+				{
+					<div class="alert alert-success d-flex justify-content-between align-items-center">
+						<span>@sharesSuccessMessage</span>
+						<button type="button" class="btn-close" aria-label="Fermer" @onclick="() => sharesSuccessMessage = string.Empty"></button>
+					</div>
+				}
+
+				<div class="card">
+					<div class="d-flex align-items-center gap-3">
+						<span class="fw-bold" style="min-width: 120px;">@owners[0].Name (@firstOwnerSharePercent%)</span>
+						<input type="range" min="0" max="100" step="1"
+							   @bind="firstOwnerSharePercent" @bind:event="oninput"
+							   style="flex: 1;" disabled="@isSavingShares" />
+						<span class="fw-bold" style="min-width: 120px; text-align: right;">(@(100 - firstOwnerSharePercent)%) @owners[1].Name</span>
+						<button class="btn btn-sm btn-primary" @onclick="SaveOwnerShares" disabled="@isSavingShares">
+							@(isSavingShares ? "Enregistrement..." : "Enregistrer")
+						</button>
+					</div>
+				</div>
+			</div>
+		}
+
+		<div class="section mt-4">
+			<h2>Répartition des montants</h2>
+
+			@if (!string.IsNullOrEmpty(errorMessage))
+			{
+				<div class="alert alert-danger">
+					@errorMessage
+				</div>
+			}
+
+			@if (!string.IsNullOrEmpty(successMessage))
+			{
+				<div class="alert alert-success">
+					@successMessage
+				</div>
+			}
+
+			<div class="card">
+				<div class="mb-3 d-flex justify-content-between align-items-center">
+					<div>
+						<strong>Total des pondérations&nbsp;: @totalWeightPercent.ToString("N2")%</strong>
+						@if (totalWeightPercent > 100)
+						{
+							<span class="text-danger ms-2">Dépasse 100%</span>
+						}
+						else if (totalWeightPercent < 100 && isEditing)
+						{
+							<span class="text-warning ms-2">Doit être égal à 100%</span>
+						}
+						else if (totalWeightPercent == 100)
+						{
+							<span class="text-success ms-2">Total correct</span>
+							@if (!AllOwnerSharesMatch())
+							{
+								<span class="text-danger ms-2">Répartition incorrecte</span>
+							}
+						}
+						@foreach (var owner in owners)
+						{
+							var ownerSum = GetOwnerWeightSum(owner.Id);
+							var target = owner.AllocationSharePercent * 100;
+							var matches = Math.Abs(ownerSum - target) < 0.01m;
+							<div class="small @(matches ? "text-success" : "text-danger")">
+								@owner.Name&nbsp;: @ownerSum.ToString("N2")% / @target.ToString("N2")% attendu
+							</div>
+						}
+					</div>
+					<div class="d-flex align-items-center gap-2">
+						@if (!isEditing)
+						{
+							<button class="btn btn-primary" @onclick="StartBulkEdit">
+								Modifier
+							</button>
+						}
+						else
+						{
+							<button class="btn btn-success" @onclick="SaveAllRules" disabled="@(totalWeightPercent != 100 || isSaving || !AllOwnerSharesMatch())">
+								@if (isSaving)
+								{
+									<span>Enregistrement...</span>
+								}
+								else
+								{
+									<span>Enregistrer</span>
+								}
+							</button>
+							<button class="btn btn-secondary" @onclick="CancelBulkEdit" disabled="@isSaving">
+								Annuler
+							</button>
+						}
+					</div>
+				</div>
+
+				<div class="rules-table">
+					<table class="table">
+						<thead>
+							<tr>
+								<th>Compte</th>
+								<th>Propriétaire</th>
+								<th>Répartition (%)</th>
+								<th>Niveau de liquidité</th>
+								<th>Seuil de virement (€)</th>
+								<th>Accumulateur (€)</th>
+								@if (isEditing)
+								{
+									<th>Actions</th>
+								}
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var rule in editingRules)
+							{
+								<tr>
+									<td data-label="Compte">
+										@if (isEditing)
+										{
+											<input type="text" @bind="rule.AccountName" class="form-control form-control-sm" />
+										}
+										else
+										{
+											<strong>@rule.AccountName</strong>
+										}
+									</td>
+									<td data-label="Propriétaire">
+										@if (isEditing)
+										{
+											<select @bind="rule.OwnerIdString" class="form-control form-control-sm" style="width: 150px;">
+												@foreach (var owner in owners)
+												{
+													<option value="@owner.Id">@owner.Name</option>
+												}
+											</select>
+										}
+										else
+										{
+											@GetOwnerDisplayName(rule.OwnerId)
+										}
+									</td>
+									<td data-label="Répartition (%)">
+										@if (isEditing)
+										{
+											<div class="d-flex align-items-center">
+												<input type="number" step="0.01" min="0" max="100"
+													   @bind="rule.WeightPercent"
+													   @bind:event="oninput"
+													   @onchange="RecalculateTotal"
+													   class="form-control form-control-sm" style="width: 100px; display: inline-block;" />
+												<span class="ms-1">%</span>
+											</div>
+										}
+										else
+										{
+											<span>@rule.WeightPercent.ToString("N2") %</span>
+										}
+									</td>
+									<td data-label="Niveau de liquidité">
+										@if (isEditing)
+										{
+											<select @bind="rule.LiquidityLevel" @bind:after="MarkLiquidityChartDirty" class="form-control form-control-sm" style="width: 150px;">
+												<option value="Liquide">Liquide</option>
+												<option value="MoyenTerme">Moyen Terme</option>
+												<option value="LongTerme">Long Terme</option>
+											</select>
+										}
+										else
+										{
+											@GetLiquidityLabel(rule.LiquidityLevel)
+										}
+									</td>
+									<td data-label="Seuil de virement (€)">
+										@if (isEditing)
+										{
+											<input type="number" step="0.01" min="0"
+												   @bind="rule.TransferThreshold"
+												   class="form-control form-control-sm" style="width: 100px;" />
+										}
+										else
+										{
+											<span>@rule.TransferThreshold.ToString("N2") €</span>
+										}
+									</td>
+									<td data-label="Accumulateur (€)">
+										@if (isEditing)
+										{
+											<input type="number" step="0.01" min="0"
+												   @bind="rule.TransferAccumulator"
+												   class="form-control form-control-sm" style="width: 100px;" />
+										}
+										else
+										{
+											<span>@rule.TransferAccumulator.ToString("N2") €</span>
+										}
+									</td>
+									@if (isEditing)
+									{
+										<td data-label="Actions">
+											<button class="btn btn-sm btn-danger" @onclick="@(() => DeleteRuleAsync(rule))" disabled="@isSaving">
+												Supprimer
+											</button>
+										</td>
+									}
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+
+		<!-- Répartition par niveau de liquidité -->
+		@if (GetLiquidityBreakdown().Any())
+		{
+			<div class="section mt-4">
+				<h2>Répartition par niveau de liquidité</h2>
+				<div class="card">
+					<div class="chart-container liquidity-chart-container">
+						<canvas id="liquidityChart"></canvas>
+					</div>
+				</div>
+			</div>
+		}
+
+		<!-- Nouveau compte -->
+		<div class="section mt-4">
+			<h2>Ajouter un compte</h2>
+
+			@if (!string.IsNullOrEmpty(addAccountError))
+			{
+				<div class="alert alert-danger">@addAccountError</div>
+			}
+			@if (!string.IsNullOrEmpty(addAccountSuccess))
+			{
+				<div class="alert alert-success">@addAccountSuccess</div>
+			}
+
+			<div class="card">
+				<div class="row g-2 align-items-end">
+					<div class="col-md-6">
+						<label class="form-label">Nom</label>
+						<input type="text" class="form-control form-control-sm" @bind="newAccount.Name"
+							placeholder="ex. PEA Fortuneo Louis" maxlength="200" />
+					</div>
+					<div class="col-md-3">
+						<label class="form-label">Propriétaire</label>
+						<select class="form-control form-control-sm" @bind="NewOwnerIdString">
+							@foreach (var owner in owners)
+							{
+								<option value="@owner.Id">@owner.Name</option>
+							}
+						</select>
+					</div>
+					<div class="col-md-3">
+						<label class="form-label">Niveau de liquidité</label>
+						<select class="form-control form-control-sm" @bind="newAccount.LiquidityLevel">
+							<option value="Liquide">Liquide</option>
+							<option value="MoyenTerme">Moyen Terme</option>
+							<option value="LongTerme">Long Terme</option>
+						</select>
+					</div>
+					<div class="col-md-3">
+						<label class="form-label">Seuil de virement (€)</label>
+						<input type="number" step="0.01" min="0" class="form-control form-control-sm" @bind="newAccount.TransferThreshold" />
+					</div>
+					<div class="col-md-3">
+						<button class="btn btn-primary btn-sm w-100" @onclick="AddAccount"
+							disabled="@isAddingAccount">
+							@if (isAddingAccount) { <span>Ajout...</span> } else { <span>+ Ajouter le compte</span> }
+						</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+</div>
+
+@code {
+	private List<EditableAllocationRule> editingRules = new();
+	private List<EditableAllocationRule> originalRules = new();
+	private bool isLoading = true;
+	private bool isEditing = false;
+	private bool isSaving = false;
+	private List<PersonSettingsDto> owners = new();
+	private Dictionary<int, string> ownerNames = new();
+	private decimal totalWeightPercent = 0;
+	private string errorMessage = string.Empty;
+	private string successMessage = string.Empty;
+
+	// Nouveau compte
+	private CreateSavingsAccountRequest newAccount = new();
+	private string _newOwnerIdString = string.Empty;
+	private string NewOwnerIdString
+	{
+		get => _newOwnerIdString;
+		set
+		{
+			_newOwnerIdString = value;
+			newAccount.OwnerId = int.TryParse(value, out var v) ? v : null;
+		}
+	}
+	private bool isAddingAccount = false;
+	private string addAccountError = string.Empty;
+	private string addAccountSuccess = string.Empty;
+
+	// Répartition entre propriétaires
+	private int firstOwnerSharePercent = 50;
+	private bool isSavingShares = false;
+	private string sharesErrorMessage = string.Empty;
+	private string sharesSuccessMessage = string.Empty;
+
+	// Répartition par niveau de liquidité
+	private bool liquidityChartRendered = false;
+	private static readonly Dictionary<string, string> LiquidityLabels = new()
+	{
+		["Liquide"] = "Liquide",
+		["MoyenTerme"] = "Moyen Terme",
+		["LongTerme"] = "Long Terme"
+	};
+
+	protected override async Task OnInitializedAsync()
+	{
+		await LoadPersonNames();
+		newAccount.OwnerId = owners.FirstOrDefault()?.Id;
+		_newOwnerIdString = newAccount.OwnerId?.ToString() ?? string.Empty;
+		await LoadData();
+	}
+
+	protected override async Task OnAfterRenderAsync(bool firstRender)
+	{
+		if (!liquidityChartRendered && GetLiquidityBreakdown().Any())
+		{
+			try
+			{
+				await Task.Delay(50);
+				await RenderLiquidityChartAsync();
+				liquidityChartRendered = true;
+			}
+			catch (Exception ex)
+			{
+				Console.WriteLine($"Error rendering liquidity chart: {ex.Message}");
+			}
+		}
+	}
+
+	private string GetLiquidityLabel(string liquidityLevel) =>
+		LiquidityLabels.GetValueOrDefault(liquidityLevel, liquidityLevel);
+
+	private List<(string Label, decimal Percent)> GetLiquidityBreakdown()
+	{
+		return editingRules
+			.Where(r => r.WeightPercent > 0)
+			.GroupBy(r => r.LiquidityLevel)
+			.Select(g => (Label: GetLiquidityLabel(g.Key), Percent: g.Sum(r => r.WeightPercent)))
+			.OrderByDescending(x => x.Percent)
+			.ToList();
+	}
+
+	private async Task RenderLiquidityChartAsync()
+	{
+		var breakdown = GetLiquidityBreakdown();
+		if (breakdown.Count == 0) return;
+
+		var labels = breakdown.Select(b => b.Label).ToArray();
+		var percentages = breakdown.Select(b => (double)b.Percent).ToArray();
+
+		await JS.InvokeVoidAsync("renderLiquidityChart", labels, percentages);
+	}
+
+	private void MarkLiquidityChartDirty()
+	{
+		liquidityChartRendered = false;
+	}
+
+	private async Task LoadPersonNames()
+	{
+		try
+		{
+			owners = (await PersonSettingsApi.GetAllAsync()).OrderBy(s => s.Id).ToList();
+			ownerNames = OwnerNameLookup.BuildMap(owners);
+
+			if (owners.Count > 0)
+				firstOwnerSharePercent = (int)Math.Round(owners[0].AllocationSharePercent * 100);
+		}
+		catch (Exception ex) { _ = ex; }
+	}
+
+	private decimal GetOwnerWeightSum(int ownerId) =>
+		editingRules.Where(r => r.OwnerId == ownerId && r.WeightPercent > 0).Sum(r => r.WeightPercent);
+
+	private bool AllOwnerSharesMatch() =>
+		owners.All(o => Math.Abs(GetOwnerWeightSum(o.Id) - (o.AllocationSharePercent * 100)) < 0.01m);
+
+	private async Task SaveOwnerShares()
+	{
+		if (owners.Count < 2) return;
+
+		isSavingShares = true;
+		sharesErrorMessage = string.Empty;
+		sharesSuccessMessage = string.Empty;
+
+		try
+		{
+			var requests = new List<UpdateOwnerShareRequest>
+			{
+				new() { OwnerId = owners[0].Id, SharePercent = firstOwnerSharePercent / 100m },
+				new() { OwnerId = owners[1].Id, SharePercent = (100 - firstOwnerSharePercent) / 100m }
+			};
+
+			var response = await AllocationRuleApi.UpdateOwnerSharesAsync(requests);
+			if (response.IsSuccessStatusCode)
+			{
+				sharesSuccessMessage = "Répartition mise à jour avec succès ! Ce changement s'appliquera à partir du prochain mois enregistré ; les mois déjà enregistrés ne sont pas modifiés.";
+				await LoadPersonNames();
+			}
+			else
+			{
+				var body = await response.Content.ReadAsStringAsync();
+				sharesErrorMessage = $"Erreur : {body}";
+			}
+		}
+		catch (Exception ex) { sharesErrorMessage = $"Erreur : {ex.Message}"; }
+		finally { isSavingShares = false; }
+	}
+
+	private string GetOwnerDisplayName(int? ownerId) => OwnerNameLookup.GetName(ownerNames, ownerId);
+
+	private async Task LoadData()
+	{
+		isLoading = true;
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+
+		try
+		{
+			var response = await AllocationRuleApi.GetWithAccountsAsync();
+
+			if (response != null)
+			{
+				editingRules = response.Rules.Select(r => new EditableAllocationRule
+				{
+					SavingsAccountId = r.SavingsAccountId,
+					AccountName = r.AccountName,
+					OwnerId = r.OwnerId,
+					WeightPercent = r.Weight * 100,
+					LiquidityLevel = r.LiquidityLevel,
+					TransferThreshold = r.TransferThreshold,
+					TransferAccumulator = r.TransferAccumulator
+				}).ToList();
+
+				originalRules = editingRules.Select(r => r.Clone()).ToList();
+
+				totalWeightPercent = response.TotalWeightPercent;
+				liquidityChartRendered = false;
+			}
+		}
+		catch (Exception ex)
+		{
+			errorMessage = $"Erreur lors du chargement : {ex.Message}";
+		}
+		finally
+		{
+			isLoading = false;
+		}
+	}
+
+	private void StartBulkEdit()
+	{
+		isEditing = true;
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+	}
+
+	private void CancelBulkEdit()
+	{
+		editingRules = originalRules.Select(r => r.Clone()).ToList();
+
+		RecalculateTotal();
+		isEditing = false;
+		errorMessage = string.Empty;
+	}
+
+	private void RecalculateTotal()
+	{
+		totalWeightPercent = editingRules.Where(r => r.WeightPercent > 0).Sum(r => r.WeightPercent);
+		liquidityChartRendered = false;
+	}
+
+	private async Task DeleteRuleAsync(EditableAllocationRule rule)
+	{
+		var confirmed = await JS.InvokeAsync<bool>("confirm", $"Supprimer définitivement le compte '{rule.AccountName}' ?");
+		if (!confirmed) return;
+
+		isSaving = true;
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+
+		try
+		{
+			var response = await AllocationRuleApi.DeleteSavingsAccountAsync(rule.SavingsAccountId);
+			if (!response.IsSuccessStatusCode)
+			{
+				var body = await response.Content.ReadAsStringAsync();
+				errorMessage = $"Erreur ({(int)response.StatusCode}) : {body}";
+				return;
+			}
+
+			await LoadData();
+			successMessage = $"Compte '{rule.AccountName}' supprimé.";
+		}
+		catch (Exception ex) { errorMessage = $"Erreur : {ex.Message}"; }
+		finally { isSaving = false; }
+	}
+
+	private async Task SaveAllRules()
+	{
+		if (totalWeightPercent != 100)
+		{
+			errorMessage = totalWeightPercent > 100
+				? "La somme des pondérations dépasse 100%"
+				: "La somme des pondérations doit être égale à 100%";
+			return;
+		}
+
+		if (!AllOwnerSharesMatch())
+		{
+			errorMessage = "La somme des pondérations d'un propriétaire ne correspond pas à sa répartition d'allocation. Vérifiez les totaux ci-dessus.";
+			return;
+		}
+
+		isSaving = true;
+		errorMessage = string.Empty;
+		successMessage = string.Empty;
+
+		try
+		{
+			var bulkRequest = editingRules.Select(r => new BulkUpdateAllocationRuleRequest
+			{
+				SavingsAccountId = r.SavingsAccountId,
+				AccountName = r.AccountName,
+				Weight = r.WeightPercent / 100m,
+				OwnerId = r.OwnerId,
+				LiquidityLevel = r.LiquidityLevel,
+				TransferThreshold = r.TransferThreshold,
+				TransferAccumulator = r.TransferAccumulator
+			}).ToList();
+
+			var response = await AllocationRuleApi.BulkUpdateAsync(bulkRequest);
+			if (response.IsSuccessStatusCode)
+			{
+				await LoadData();
+				isEditing = false;
+				successMessage = "Règles d'allocation mises à jour avec succès ! Ce changement s'appliquera à partir du prochain mois enregistré ; les mois déjà enregistrés ne sont pas modifiés.";
+			}
+			else
+			{
+				var body = await response.Content.ReadAsStringAsync();
+				errorMessage = $"Erreur : {body}";
+			}
+		}
+		catch (Exception ex) { errorMessage = $"Erreur : {ex.Message}"; }
+		finally { isSaving = false; }
+	}
+
+	private async Task AddAccount()
+	{
+		addAccountError = string.Empty;
+		addAccountSuccess = string.Empty;
+
+		if (string.IsNullOrWhiteSpace(newAccount.Name))
+		{
+			addAccountError = "Le nom est obligatoire.";
+			return;
+		}
+
+		isAddingAccount = true;
+		try
+		{
+			var response = await AllocationRuleApi.CreateSavingsAccountAsync(newAccount);
+			if (response.IsSuccessStatusCode)
+			{
+				addAccountSuccess = $"Compte '{newAccount.Name}' ajouté avec succès.";
+				newAccount = new() { OwnerId = owners.FirstOrDefault()?.Id };
+				_newOwnerIdString = newAccount.OwnerId?.ToString() ?? string.Empty;
+				await LoadData();
+			}
+			else
+			{
+				var body = await response.Content.ReadAsStringAsync();
+				addAccountError = $"Erreur ({(int)response.StatusCode}) : {body}";
+			}
+		}
+		catch (Exception ex) { addAccountError = $"Erreur : {ex.Message}"; }
+		finally { isAddingAccount = false; }
+	}
+
+	private class EditableAllocationRule
+	{
+		public int SavingsAccountId { get; set; }
+		public string AccountName { get; set; } = string.Empty;
+		public int? OwnerId { get; set; }
+		public decimal WeightPercent { get; set; }
+		public string LiquidityLevel { get; set; } = "Liquide";
+		public decimal TransferThreshold { get; set; }
+		public decimal TransferAccumulator { get; set; }
+
+		public string OwnerIdString
+		{
+			get => OwnerId?.ToString() ?? string.Empty;
+			set => OwnerId = int.TryParse(value, out var v) ? v : null;
+		}
+
+		public EditableAllocationRule Clone() => new()
+		{
+			SavingsAccountId = SavingsAccountId,
+			AccountName = AccountName,
+			OwnerId = OwnerId,
+			WeightPercent = WeightPercent,
+			LiquidityLevel = LiquidityLevel,
+			TransferThreshold = TransferThreshold,
+			TransferAccumulator = TransferAccumulator
+		};
+	}
+}

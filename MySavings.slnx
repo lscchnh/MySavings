@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="MySavings.ApiService/MySavings.ApiService.csproj" />
+  <Project Path="MySavings.AppHost/MySavings.AppHost.csproj" />
+  <Project Path="MySavings.ServiceDefaults/MySavings.ServiceDefaults.csproj" />
+  <Project Path="MySavings.Tests/MySavings.Tests.csproj" />
+  <Project Path="MySavings.Web/MySavings.Web.csproj" />
+</Solution>

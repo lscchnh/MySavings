@@ -1,0 +1,296 @@
+﻿@page "/"
+@using MySavings.Web.ApiClients
+@inject DashboardApiClient ConsolidatedApi
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard - MySavings</PageTitle>
+
+<div class="dashboard-header">
+    <h1>Dashboard</h1>
+</div>
+
+@if (isLoading)
+{
+    <p><em>Chargement...</em></p>
+}
+else if (summary == null)
+{
+    <div class="empty-state">
+        <p>Aucune donnée disponible. Importez vos données Excel pour commencer.</p>
+        <a href="/settings" class="btn btn-primary">Aller dans Paramètres</a>
+    </div>
+}
+else
+{
+    <div class="dashboard-grid">
+        <!-- Résumé du mois courant -->
+        <div class="card summary-card">
+            <h3>Résumé — @summary.CurrentMonth.ToString("MMMM yyyy")</h3>
+            <div class="summary-stats">
+                <div class="stat">
+                    <span class="stat-label">Revenus totaux</span>
+                    <span class="stat-value">@summary.TotalSalary.ToString("N2") €</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Dépenses totales</span>
+                    <span class="stat-value expense">@summary.TotalExpenses.ToString("N2") €</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Épargne</span>
+                    <span class="stat-value savings">@summary.TotalSavings.ToString("N2") €</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Ratio E/S</span>
+                    <span class="stat-value ratio">@((summary.SavingsRatio * 100).ToString("N1"))%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Graphiques d'évolution -->
+        @if (summary.Months.Any())
+        {
+            <div class="card charts-card">
+                <div class="charts-header">
+                    <h3>Évolution des finances</h3>
+                    <div class="chart-controls">
+                        <div class="chart-filters">
+                            <label>Afficher</label>
+                            <select @bind="selectedMonthsCount" @bind:after="RenderChartsAfterFilter" class="form-select">
+                                <option value="3">3 derniers mois</option>
+                                <option value="6">6 derniers mois</option>
+                                <option value="12">12 derniers mois</option>
+                                <option value="24">24 derniers mois</option>
+                                <option value="0">Tous les mois</option>
+                            </select>
+                        </div>
+                        <div class="month-toggle-filter" style="position:relative;">
+                            <label>Afficher / Masquer</label>
+                            <button type="button" class="month-dropdown-toggle" @onclick="ToggleMonthDropdown">
+                                Sélectionner...
+                            </button>
+                            @if (isMonthDropdownOpen)
+                            {
+                                <div style="position:fixed; inset:0; z-index:999;" @onclick="CloseMonthDropdown"></div>
+                                <div class="month-dropdown-menu" style="z-index:1000;">
+                                    @foreach (var month in GetDisplayedRange().OrderByDescending(t => t.Month))
+                                    {
+                                        var monthKey = GetMonthKey(month.Month);
+                                        var isHidden = IsMonthHidden(month.Month);
+                                        <button type="button" class="month-dropdown-item" @onclick="() => ToggleMonthVisibilityAsync(monthKey)" @onclick:stopPropagation>
+                                            <span class="month-status-icon" aria-hidden="true">@(isHidden ? "🚫" : "👁️")</span>
+                                            <span>@month.Month.ToString("MMM yyyy")</span>
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+                @if (!GetFilteredTrends().Any())
+                {
+                    <p class="no-visible-months">Aucun mois visible. Démasquez au moins un mois pour afficher les graphiques.</p>
+                }
+                <div class="chart-tabs">
+                    @foreach (var tab in chartTabs)
+                    {
+                        <button type="button" class="chart-tab-btn @(selectedChartTab == tab.Key ? "active" : "")" @onclick="() => SelectChartTab(tab.Key)">
+                            @tab.Label
+                        </button>
+                    }
+                </div>
+                <div class="charts-grid">
+                    <div class="@ChartContainerClass("salary")">
+                        <button type="button" class="chart-expand-btn" title="@(isChartExpanded ? "Fermer" : "Agrandir en paysage")" @onclick="ToggleChartExpand">@(isChartExpanded ? "✕" : "⤢")</button>
+                        <div class="chart-canvas-wrap"><canvas id="salaryChart"></canvas></div>
+                    </div>
+                    <div class="@ChartContainerClass("expenses")">
+                        <button type="button" class="chart-expand-btn" title="@(isChartExpanded ? "Fermer" : "Agrandir en paysage")" @onclick="ToggleChartExpand">@(isChartExpanded ? "✕" : "⤢")</button>
+                        <div class="chart-canvas-wrap"><canvas id="expensesChart"></canvas></div>
+                    </div>
+                    <div class="@ChartContainerClass("savings")">
+                        <button type="button" class="chart-expand-btn" title="@(isChartExpanded ? "Fermer" : "Agrandir en paysage")" @onclick="ToggleChartExpand">@(isChartExpanded ? "✕" : "⤢")</button>
+                        <div class="chart-canvas-wrap"><canvas id="savingsChart"></canvas></div>
+                    </div>
+                    <div class="@ChartContainerClass("ratio")">
+                        <button type="button" class="chart-expand-btn" title="@(isChartExpanded ? "Fermer" : "Agrandir en paysage")" @onclick="ToggleChartExpand">@(isChartExpanded ? "✕" : "⤢")</button>
+                        <div class="chart-canvas-wrap"><canvas id="ratioChart"></canvas></div>
+                    </div>
+                    <div class="@ChartContainerClass("cumulative")">
+                        <button type="button" class="chart-expand-btn" title="@(isChartExpanded ? "Fermer" : "Agrandir en paysage")" @onclick="ToggleChartExpand">@(isChartExpanded ? "✕" : "⤢")</button>
+                        <div class="chart-canvas-wrap"><canvas id="cumulativeSavingsChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private DashboardSummaryDto? summary;
+    private bool isLoading = true;
+    private bool chartsRendered = false;
+    private int selectedMonthsCount = 12;
+    private readonly HashSet<string> hiddenMonthKeys = [];
+    private bool isMonthDropdownOpen;
+    private string selectedChartTab = "salary";
+    private bool isChartExpanded;
+
+    private readonly (string Key, string Label)[] chartTabs =
+    [
+        ("salary", "Revenus"),
+        ("expenses", "Dépenses"),
+        ("savings", "Épargne"),
+        ("ratio", "Ratio E/S"),
+        ("cumulative", "Cumul"),
+    ];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!chartsRendered && summary != null && summary.Months.Any())
+        {
+            try
+            {
+                await Task.Delay(100); // Small delay to ensure DOM is ready
+                await RenderCharts();
+                chartsRendered = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error rendering charts: {ex.Message}");
+            }
+        }
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        try
+        {
+            summary = await ConsolidatedApi.GetDashboardSummaryAsync();
+
+            if (summary != null)
+            {
+                var availableMonthKeys = summary.Months
+                    .Select(t => GetMonthKey(t.Month))
+                    .ToHashSet();
+
+                hiddenMonthKeys.RemoveWhere(key => !availableMonthKeys.Contains(key));
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = ex;
+            summary = null;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RenderCharts()
+    {
+        if (summary == null || !summary.Months.Any()) return;
+
+        var dataToDisplay = GetFilteredTrends().ToList();
+
+        var months = dataToDisplay.Select(t => t.Month.ToString("MMM yyyy")).ToArray();
+        var salaries = dataToDisplay.Select(t => (double)t.Salary).ToArray();
+        var expenses = dataToDisplay.Select(t => (double)t.Expenses).ToArray();
+        var savings = dataToDisplay.Select(t => (double)t.Savings).ToArray();
+        var ratios = dataToDisplay.Select(t => (double)(t.SavingsRatio * 100)).ToArray();
+
+        decimal runningTotal = 0;
+        var cumulativeSavings = dataToDisplay.Select(t => (double)(runningTotal += t.Savings)).ToArray();
+
+        await JS.InvokeVoidAsync("renderCharts", months, salaries, expenses, savings, ratios, cumulativeSavings);
+    }
+
+    private async Task RenderChartsAfterFilter()
+    {
+        chartsRendered = false;
+        await Task.Delay(50);
+        await RenderCharts();
+        chartsRendered = true;
+    }
+
+    private IEnumerable<MonthlyTrendDto> GetFilteredTrends()
+    {
+        return GetDisplayedRange().Where(t => !IsMonthHidden(t.Month));
+    }
+
+    private IEnumerable<MonthlyTrendDto> GetDisplayedRange()
+    {
+        if (summary == null)
+        {
+            return Enumerable.Empty<MonthlyTrendDto>();
+        }
+
+        return selectedMonthsCount == 0
+            ? summary.Months.OrderBy(t => t.Month)
+            : summary.Months.OrderByDescending(t => t.Month).Take(selectedMonthsCount).OrderBy(t => t.Month);
+    }
+
+    private bool IsMonthHidden(DateTime month)
+    {
+        return hiddenMonthKeys.Contains(GetMonthKey(month));
+    }
+
+    private void ToggleMonthDropdown() => isMonthDropdownOpen = !isMonthDropdownOpen;
+
+    private void CloseMonthDropdown() => isMonthDropdownOpen = false;
+
+    private async Task ToggleMonthVisibilityAsync(string monthKey)
+    {
+        if (string.IsNullOrWhiteSpace(monthKey))
+        {
+            return;
+        }
+
+        if (!hiddenMonthKeys.Add(monthKey))
+        {
+            hiddenMonthKeys.Remove(monthKey);
+        }
+
+        await RenderChartsAfterFilter();
+    }
+
+    private static string GetMonthKey(DateTime month)
+    {
+        return month.ToString("yyyy-MM");
+    }
+
+    private async Task SelectChartTab(string key)
+    {
+        if (selectedChartTab == key) return;
+        selectedChartTab = key;
+        StateHasChanged();
+        await Task.Delay(50); // let the DOM update (chart container becomes visible) before Chart.js resizes it
+        await JS.InvokeVoidAsync("resizeVisibleCharts");
+    }
+
+    private string ChartContainerClass(string key)
+    {
+        var classes = "chart-container";
+        if (selectedChartTab == key) classes += " active";
+        if (selectedChartTab == key && isChartExpanded) classes += " expanded";
+        return classes;
+    }
+
+    private async Task ToggleChartExpand()
+    {
+        isChartExpanded = !isChartExpanded;
+        StateHasChanged();
+        await Task.Delay(50); // let the DOM update (container is rotated/resized) before Chart.js resizes it
+        await JS.InvokeVoidAsync("resizeVisibleCharts");
+    }
+
+    }

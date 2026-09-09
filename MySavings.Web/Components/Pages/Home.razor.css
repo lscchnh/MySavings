@@ -1,0 +1,431 @@
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.dashboard-header h1 {
+    margin: 0;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state p {
+    margin-bottom: 1.5rem;
+    color: #666;
+    font-size: 1.1rem;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    width: 100%;
+    max-width: 100%;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.card h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #333;
+    font-size: 1.2rem;
+}
+
+.summary-card {
+    grid-column: 1 / -1;
+}
+
+.charts-card {
+    grid-column: 1 / -1;
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.charts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.charts-header h3 {
+    margin: 0;
+}
+
+.chart-filters {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-filters .form-select {
+    min-width: 180px;
+}
+
+.chart-filters label {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.form-select {
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.chart-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.6rem;
+}
+
+.month-toggle-filter {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    position: relative;
+}
+
+.month-toggle-filter label {
+    font-size: 0.9rem;
+    color: #666;
+    white-space: nowrap;
+}
+
+.month-dropdown-toggle {
+    min-width: 180px;
+    max-width: 340px;
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    text-align: left;
+    background: #fff;
+    color: #111827;
+    cursor: pointer;
+}
+
+.month-dropdown-toggle:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.month-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    min-width: 180px;
+    max-width: 180px;
+    width: 100%;
+    max-height: 220px;
+    overflow-y: auto;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    z-index: 20;
+    padding: 0.25rem;
+}
+
+.month-dropdown-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    border: none;
+    background: transparent;
+    text-align: left;
+    border-radius: 4px;
+    padding: 0.45rem 0.5rem;
+    font-size: 0.88rem;
+    color: #111827;
+    cursor: pointer;
+}
+
+.month-dropdown-item:hover {
+    background: #f3f4f6;
+}
+
+.month-status-icon {
+    width: 1.2rem;
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+.no-visible-months {
+    margin: 0.75rem 0 0;
+    font-size: 0.9rem;
+    color: #b45309;
+}
+
+.chart-tabs {
+    display: none;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    margin-top: 1rem;
+    width: 100%;
+}
+
+.chart-container {
+    position: relative;
+    height: 500px;
+    width: 100%;
+    min-height: 400px;
+}
+
+.chart-canvas-wrap {
+    width: 100%;
+    height: 100%;
+}
+
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.chart-expand-btn {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .charts-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    .chart-controls {
+        align-items: flex-start;
+        width: 100%;
+    }
+
+    .chart-filters,
+    .month-toggle-filter {
+        width: 100%;
+    }
+
+    .chart-filters .form-select {
+        width: 100%;
+    }
+
+    .month-toggle-filter {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .month-dropdown-toggle,
+    .month-dropdown-menu {
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .chart-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .chart-tab-btn {
+        padding: 0.4rem 0.85rem;
+        border: 1px solid #ddd;
+        border-radius: 999px;
+        background: #fff;
+        color: #374151;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+
+    .chart-tab-btn.active {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: #fff;
+    }
+
+    .charts-grid {
+        gap: 0;
+    }
+
+    .chart-container {
+        display: none;
+        height: 380px;
+        min-height: 380px;
+    }
+
+    .chart-container.active {
+        display: block;
+    }
+
+    .chart-expand-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        width: 2.1rem;
+        height: 2.1rem;
+        border-radius: 50%;
+        border: 1px solid #ddd;
+        background: #fff;
+        color: #374151;
+        font-size: 1.1rem;
+        line-height: 1;
+        cursor: pointer;
+        z-index: 5;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Forces a landscape-shaped view of the active chart without needing the phone to
+       physically rotate: the container is sized to the viewport's tall axis (100vh) and
+       rotated 90deg, so it renders as a wide rectangle the user reads by turning their phone. */
+    .chart-container.expanded {
+        position: fixed;
+        top: 0;
+        left: 100%;
+        width: 100vh;
+        height: 100vw;
+        min-height: 0;
+        transform-origin: 0 0;
+        transform: rotate(90deg);
+        background: #fff;
+        z-index: 2000;
+        padding: 1rem 1.25rem;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Most phones' true landscape ratio (~2:1 or more) is too flat for a line chart, so
+       the chart is capped at 16:9 and centered instead of stretched to fill the width. */
+    .chart-container.expanded .chart-canvas-wrap {
+        width: auto;
+        height: 100%;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+    }
+
+    .summary-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: #2563eb;
+}
+
+.stat-value.expense {
+    color: #dc2626;
+}
+
+.stat-value.savings {
+    color: #16a34a;
+}
+
+.stat-value.ratio {
+    color: #7c3aed;
+}

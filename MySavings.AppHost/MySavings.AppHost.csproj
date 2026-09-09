@@ -1,0 +1,16 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.5.3">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>6fc13191-ad00-43c4-85b3-d68a262a778f</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MySavings.ApiService\MySavings.ApiService.csproj" />
+    <ProjectReference Include="..\MySavings.Web\MySavings.Web.csproj" />
+  </ItemGroup>
+
+</Project>

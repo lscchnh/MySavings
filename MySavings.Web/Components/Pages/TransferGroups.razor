@@ -1,0 +1,252 @@
+@page "/transfer-groups"
+@using MySavings.Web.ApiClients
+@inject TransferGroupApiClient TransferGroupApi
+@inject AllocationRuleApiClient AllocationRuleApi
+@rendermode InteractiveServer
+
+<PageTitle>Groupements de virements - MySavings</PageTitle>
+
+<h1>Groupements de virements</h1>
+
+<div class="page-container">
+    @if (isLoading)
+    {
+        <p><em>Chargement...</em></p>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">@errorMessage</div>
+        }
+        @if (!string.IsNullOrEmpty(successMessage))
+        {
+            <div class="alert alert-success">@successMessage</div>
+        }
+
+        <!-- Liste des groupements existants -->
+        <div class="section">
+            <h2>Groupements existants</h2>
+            @if (!groups.Any())
+            {
+                <div class="card"><p>Aucun groupement configuré.</p></div>
+            }
+            else
+            {
+                @foreach (var g in groups)
+                {
+                    <div class="card">
+                        @if (editingGroupId == g.Id)
+                        {
+                            <!-- Edit form -->
+                            <div class="group-header">
+                                <div style="flex:1; margin-right:1.5rem;">
+                                    <div style="margin-bottom:0.75rem;">
+                                        <label class="form-label">Libellé</label>
+                                        <input class="form-control" @bind="editName" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label">Comptes inclus</label>
+                                        @foreach (var (accountName, idx) in editAccountNames.Select((c, i) => (c, i)))
+                                        {
+                                            <div class="account-row">
+                                                <input class="form-control form-control-sm" value="@accountName"
+                                                    @onchange="e => editAccountNames[idx] = e.Value?.ToString() ?? string.Empty"
+                                                    list="accounts-list" />
+                                                <button class="btn btn-sm btn-outline-danger" @onclick="() => editAccountNames.RemoveAt(idx)">✕</button>
+                                            </div>
+                                        }
+                                        <button class="btn btn-sm btn-outline-secondary" style="margin-top:0.25rem;" @onclick="() => editAccountNames.Add(string.Empty)">+ Ajouter un compte</button>
+                                        <datalist id="accounts-list">
+                                            @foreach (var accountName2 in availableAccountNames)
+                                            {
+                                                <option value="@accountName2" />
+                                            }
+                                        </datalist>
+                                    </div>
+                                </div>
+                                <div class="action-buttons">
+                                    <button class="btn btn-success btn-sm" @onclick="() => SaveEditAsync(g.Id)" disabled="@isSaving">
+                                        @(isSaving ? "Enregistrement..." : "Enregistrer")
+                                    </button>
+                                    <button class="btn btn-secondary btn-sm" @onclick="CancelEdit">Annuler</button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <!-- Display mode -->
+                            <div class="group-header">
+                                <div>
+                                    <h3>@g.Name</h3>
+                                    <ul>
+                                        @foreach (var account in g.Accounts)
+                                        {
+                                            <li><code>@account.Name</code></li>
+                                        }
+                                        @if (!g.Accounts.Any())
+                                        {
+                                            <li style="color:#6b7280;">Aucun compte</li>
+                                        }
+                                    </ul>
+                                </div>
+                                <div class="action-buttons" style="flex-direction:row;">
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => StartEdit(g)">Modifier</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteGroupAsync(g.Id)" disabled="@isSaving">Supprimer</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <!-- Formulaire de création -->
+        <div class="section">
+            <h2>Ajouter un groupement</h2>
+            <div class="card">
+                <div style="margin-bottom:0.75rem;">
+                    <label class="form-label">Libellé</label>
+                    <input class="form-control" @bind="newName" placeholder="ex. Virement Compte Fortuneo N°40" />
+                </div>
+                <div style="margin-bottom:1rem;">
+                    <label class="form-label">Comptes inclus</label>
+                    @foreach (var (accountName, idx) in newAccountNames.Select((c, i) => (c, i)))
+                    {
+                        <div class="account-row">
+                            <input class="form-control form-control-sm" value="@accountName"
+                                @onchange="e => newAccountNames[idx] = e.Value?.ToString() ?? string.Empty"
+                                list="accounts-list-new" />
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => newAccountNames.RemoveAt(idx)">✕</button>
+                        </div>
+                    }
+                    <button class="btn btn-sm btn-outline-secondary" style="margin-top:0.25rem;" @onclick="() => newAccountNames.Add(string.Empty)">+ Ajouter un compte</button>
+                    <datalist id="accounts-list-new">
+                        @foreach (var accountName2 in availableAccountNames)
+                        {
+                            <option value="@accountName2" />
+                        }
+                    </datalist>
+                </div>
+                <button class="btn btn-primary" @onclick="CreateGroupAsync" disabled="@isSaving">
+                    @(isSaving ? "Enregistrement..." : "+ Créer le groupement")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<TransferGroupDto> groups = new();
+    private List<string> availableAccountNames = new();
+    private bool isLoading = true;
+    private bool isSaving = false;
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
+
+    // New group form
+    private string newName = string.Empty;
+    private List<string> newAccountNames = new() { string.Empty };
+
+    // Edit state
+    private int? editingGroupId = null;
+    private string editName = string.Empty;
+    private List<string> editAccountNames = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            groups = await TransferGroupApi.GetAllAsync();
+            var accounts = await AllocationRuleApi.GetWithAccountsAsync();
+            availableAccountNames = accounts.Rules.Select(a => a.AccountName).OrderBy(c => c).ToList();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur de chargement : {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task CreateGroupAsync()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            errorMessage = "Le libellé est obligatoire.";
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            var names = newAccountNames.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+            await TransferGroupApi.CreateAsync(new CreateTransferGroupRequest(newName.Trim(), names));
+            successMessage = $"Groupement « {newName} » créé.";
+            newName = string.Empty;
+            newAccountNames = new() { string.Empty };
+            await LoadAsync();
+        }
+        catch (Exception ex) { errorMessage = $"Erreur : {ex.Message}"; }
+        finally { isSaving = false; }
+    }
+
+    private void StartEdit(TransferGroupDto g)
+    {
+        editingGroupId = g.Id;
+        editName = g.Name;
+        editAccountNames = g.Accounts.Select(a => a.Name).ToList();
+        if (!editAccountNames.Any()) editAccountNames.Add(string.Empty);
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    private void CancelEdit()
+    {
+        editingGroupId = null;
+    }
+
+    private async Task SaveEditAsync(int id)
+    {
+        errorMessage = string.Empty;
+        if (string.IsNullOrWhiteSpace(editName))
+        {
+            errorMessage = "Le libellé est obligatoire.";
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            var names = editAccountNames.Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+            await TransferGroupApi.UpdateAsync(id, new UpdateTransferGroupRequest(editName.Trim(), names));
+            successMessage = "Groupement mis à jour.";
+            editingGroupId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { errorMessage = $"Erreur : {ex.Message}"; }
+        finally { isSaving = false; }
+    }
+
+    private async Task DeleteGroupAsync(int id)
+    {
+        errorMessage = string.Empty;
+        isSaving = true;
+        try
+        {
+            await TransferGroupApi.DeleteAsync(id);
+            successMessage = "Groupement supprimé.";
+            await LoadAsync();
+        }
+        catch (Exception ex) { errorMessage = $"Erreur : {ex.Message}"; }
+        finally { isSaving = false; }
+    }
+}
