@@ -58,3 +58,6 @@ nunit-*.xml
 .vs
 MySavings.ApiService/mysavings.db-shm
 MySavings.ApiService/mysavings.db-wal
+
+# Published output
+dist/
