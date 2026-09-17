@@ -289,8 +289,10 @@ else
     {
         isChartExpanded = !isChartExpanded;
         StateHasChanged();
-        await Task.Delay(50); // let the DOM update (container is rotated/resized) before Chart.js resizes it
-        await JS.InvokeVoidAsync("resizeVisibleCharts");
+        await Task.Delay(50); // let the DOM update (container is rotated/resized) before Chart.js re-renders
+        // Chart.js caches container size internally and won't reliably re-measure after
+        // just a CSS transform change, so we force a full destroy+recreate instead of resize().
+        await JS.InvokeVoidAsync("rerenderCharts");
     }
 
     }

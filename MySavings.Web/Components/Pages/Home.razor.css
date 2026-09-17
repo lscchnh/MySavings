@@ -225,7 +225,7 @@
 
 .charts-grid {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2rem;
     margin-top: 1rem;
     width: 100%;
@@ -235,6 +235,7 @@
     position: relative;
     height: 500px;
     width: 100%;
+    min-width: 0;
     min-height: 400px;
 }
 
@@ -243,7 +244,11 @@
     height: 100%;
 }
 
-.chart-container canvas {
+/* Pas appliqué en mode agrandi (.expanded) : Chart.js y dimensionne déjà le
+   canvas via getBoundingClientRect (qui tient compte de la rotation CSS) ;
+   forcer 100% ici utiliserait les dimensions locales non tournées et inverserait
+   l'aspect du graphique (étirement). */
+.chart-container:not(.expanded) canvas {
     width: 100% !important;
     height: 100% !important;
 }
@@ -328,10 +333,12 @@
         gap: 0;
     }
 
+    /* Graphique en ratio paysage (16:9) directement dans le flux de la page */
     .chart-container {
         display: none;
-        height: 380px;
-        min-height: 380px;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        min-height: 200px;
     }
 
     .chart-container.active {
@@ -358,34 +365,36 @@
         box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
     }
 
-    /* Forces a landscape-shaped view of the active chart without needing the phone to
-       physically rotate: the container is sized to the viewport's tall axis (100vh) and
-       rotated 90deg, so it renders as a wide rectangle the user reads by turning their phone. */
+    /* Agrandissement : plein écran tourné 90° pour un rendu paysage sur téléphone en portrait.
+       La taille (100vh x 100vw) est fixée AVANT rotation, donc Chart.js calcule un canvas
+       aux proportions paysage ; la rotation ne fait qu'afficher ce rendu correctement dimensionné. */
     .chart-container.expanded {
         position: fixed;
         top: 0;
-        left: 100%;
+        left: 0;
         width: 100vh;
         height: 100vw;
-        min-height: 0;
-        transform-origin: 0 0;
-        transform: rotate(90deg);
+        min-width: 0;
+        transform-origin: top left;
+        transform: rotate(90deg) translateY(-100%);
         background: #fff;
         z-index: 2000;
-        padding: 1rem 1.25rem;
+        padding: 1rem;
         box-sizing: border-box;
         display: flex;
         align-items: center;
         justify-content: center;
     }
 
-    /* Most phones' true landscape ratio (~2:1 or more) is too flat for a line chart, so
-       the chart is capped at 16:9 and centered instead of stretched to fill the width. */
     .chart-container.expanded .chart-canvas-wrap {
-        width: auto;
+        width: 100%;
         height: 100%;
-        max-width: 100%;
-        aspect-ratio: 16 / 9;
+        aspect-ratio: unset;
+    }
+
+    /* Contre-rotation du bouton fermer pour qu'il reste lisible à l'écran */
+    .chart-container.expanded .chart-expand-btn {
+        transform: rotate(-90deg);
     }
 
     .summary-stats {

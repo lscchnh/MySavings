@@ -1,6 +1,7 @@
 // Chart.js rendering functions
 window.renderCharts = function(months, salaries, expenses, savings, ratios, cumulativeSavings) {
     console.log('Rendering charts with data:', { months, salaries, expenses, savings, ratios, cumulativeSavings });
+    window._lastChartArgs = [months, salaries, expenses, savings, ratios, cumulativeSavings];
 
     // Destroy existing charts if they exist
     if (window.salaryChartInstance) window.salaryChartInstance.destroy();
@@ -541,6 +542,18 @@ window.resizeVisibleCharts = function() {
         window.cumulativeSavingsChartInstance
     ];
     instances.forEach((chart) => chart && chart.resize());
+};
+
+// Called when toggling a chart's expanded (fullscreen, rotated for landscape) mode
+// on mobile. Chart.js caches the container size internally (tied to its
+// ResizeObserver) and does not reliably re-measure just because a CSS `transform`
+// changed without the element's own untransformed layout box changing, so
+// chart.resize() (with or without explicit dimensions) is a no-op here. Destroying
+// and recreating all charts forces Chart.js to measure the current DOM fresh.
+window.rerenderCharts = function() {
+    if (window._lastChartArgs) {
+        window.renderCharts(...window._lastChartArgs);
+    }
 };
 
 window.downloadFileFromBase64 = function(fileName, contentType, base64Data) {

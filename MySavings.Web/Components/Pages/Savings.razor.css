@@ -288,6 +288,13 @@
     color: #1e40af;
 }
 
+/* En-tête de la section allocations */
+.allocation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
     .common-fields {
@@ -295,6 +302,25 @@
     }
 
     .salary-fields {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Bouton Enregistrer centré dans le formulaire nouvelle entrée */
+    .form-actions {
+        justify-content: center;
+    }
+
+    /* Bouton Enregistrer sous le titre Montants à allouer */
+    .allocation-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+
+    /* Encarts virements : une seule colonne pour ne pas déborder */
+    .virements-grid {
         grid-template-columns: 1fr;
     }
 }
@@ -408,4 +434,10 @@
     .allocations-table tfoot .total-row td:last-child {
         display: none;
     }
+}
+
+/* Le symbole € ne doit pas passer à la ligne dans les cellules montant */
+.allocations-table tfoot strong,
+.allocations-table tbody td strong {
+    white-space: nowrap;
 }

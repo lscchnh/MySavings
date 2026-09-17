@@ -35,15 +35,19 @@
 				}
 
 				<div class="card">
-					<div class="d-flex align-items-center gap-3">
-						<span class="fw-bold" style="min-width: 120px;">@owners[0].Name (@firstOwnerSharePercent%)</span>
-						<input type="range" min="0" max="100" step="1"
-							   @bind="firstOwnerSharePercent" @bind:event="oninput"
-							   style="flex: 1;" disabled="@isSavingShares" />
-						<span class="fw-bold" style="min-width: 120px; text-align: right;">(@(100 - firstOwnerSharePercent)%) @owners[1].Name</span>
-						<button class="btn btn-sm btn-primary" @onclick="SaveOwnerShares" disabled="@isSavingShares">
-							@(isSavingShares ? "Enregistrement..." : "Enregistrer")
-						</button>
+					<div class="owner-shares-row">
+						<div class="owner-shares-labels">
+							<span class="fw-bold">@owners[0].Name (@firstOwnerSharePercent%)</span>
+							<span class="fw-bold">(@(100 - firstOwnerSharePercent)%) @owners[1].Name</span>
+						</div>
+						<div class="owner-shares-slider-row">
+							<input type="range" class="owner-shares-slider" min="0" max="100" step="1"
+								   @bind="firstOwnerSharePercent" @bind:event="oninput"
+								   disabled="@isSavingShares" />
+							<button class="btn btn-sm btn-primary" @onclick="SaveOwnerShares" disabled="@isSavingShares">
+								@(isSavingShares ? "Enregistrement..." : "Enregistrer")
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>

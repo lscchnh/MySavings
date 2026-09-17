@@ -137,6 +137,31 @@
     font-size: 0.8125rem;
 }
 
+/* Slider de répartition entre propriétaires */
+.owner-shares-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.owner-shares-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.owner-shares-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.owner-shares-slider {
+    flex: 1;
+    min-width: 0;
+}
+
 @media (max-width: 640px) {
     .rules-table {
         overflow-x: visible;

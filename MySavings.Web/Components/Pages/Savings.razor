@@ -169,7 +169,7 @@
                 @if (currentView.Allocations.Any())
                 {
                     <div class="card allocation-amounts-card">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="allocation-header mb-3">
                             <h2 class="mb-0">Montants à allouer — @currentView.Month.ToString("MMMM yyyy")</h2>
                             <div class="d-flex gap-2 align-items-center">
                                 <button class="btn btn-sm btn-primary" @onclick="SaveAllTransfersAsync" disabled="@isSavingTransfers">

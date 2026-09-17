@@ -181,3 +181,44 @@
 .account-row .form-control-sm {
     flex: 1;
 }
+
+/* Mode affichage : boutons à droite en ligne */
+.display-actions {
+    flex-direction: row;
+}
+
+/* Noms de comptes sur une seule ligne */
+.group-header ul li code {
+    white-space: nowrap;
+}
+
+/* Formulaire d'édition : champ texte + boutons */
+.edit-form-inner {
+    flex: 1;
+    margin-right: 1.5rem;
+}
+
+@media (max-width: 640px) {
+    /* En mode affichage : groupe en colonne (info au-dessus, boutons en-dessous) */
+    .group-header {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* Boutons Modifier / Supprimer : en dessous et en ligne */
+    .display-actions {
+        flex-direction: row;
+        align-self: flex-start;
+    }
+
+    /* En mode édition : pas de marge droite, les boutons passent en-dessous */
+    .edit-form-inner {
+        margin-right: 0;
+        width: 100%;
+    }
+
+    /* Boutons Enregistrer / Annuler : en ligne sous le formulaire */
+    .action-buttons:not(.display-actions) {
+        flex-direction: row;
+    }
+}
