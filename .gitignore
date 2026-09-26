@@ -68,5 +68,8 @@ MySavings.ApiService/mysavings.db-wal
 # Préférences locales Visual Studio
 *.csproj.user
 
+# Notes de développement personnelles
+.github/prompt-to-apply-when-tokens-available.md
+
 # Published output
 dist/
