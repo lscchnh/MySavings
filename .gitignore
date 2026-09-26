@@ -59,5 +59,14 @@ nunit-*.xml
 MySavings.ApiService/mysavings.db-shm
 MySavings.ApiService/mysavings.db-wal
 
+# Données personnelles : bases SQLite et sauvegardes
+*.db
+*.db-shm
+*.db-wal
+*.db.backup-*
+
+# Préférences locales Visual Studio
+*.csproj.user
+
 # Published output
 dist/
